@@ -42,11 +42,19 @@ class LLMService:
         self._tokenizer = AutoTokenizer.from_pretrained(LLM_MODEL_PATH)
 
         print("[LLMService] Loading model into GPU...")
+
+        # Old version for FP8 model (delete if not needed)  
+        # self._model = AutoModelForCausalLM.from_pretrained(
+        #     LLM_MODEL_PATH,
+        #     torch_dtype="auto",
+        #     device_map="cuda",
+        # )
+        # self._model.eval()
         self._model = AutoModelForCausalLM.from_pretrained(
             LLM_MODEL_PATH,
-            torch_dtype="auto",
-            device_map="cuda",
-        )
+            torch_dtype=torch.bfloat16,
+        ).cuda()
+
         self._model.eval()
 
         # Prefix KV cache — stores KV states for static system prompt prefix
@@ -132,9 +140,12 @@ class LLMService:
             skip_special_tokens=True,
         )
 
+        attention_mask = torch.ones_like(input_ids)
+
         generation_kwargs = dict(
             input_ids=input_ids,
             past_key_values=past_kv,
+            attention_mask=attention_mask,
             max_new_tokens=LLM_MAX_TOKENS,
             temperature=LLM_TEMPERATURE,
             do_sample=True,
