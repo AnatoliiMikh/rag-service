@@ -24,40 +24,45 @@ class RetrievalModule:
         Dense + sparse fused via Qdrant's built-in RRF.
         Returns one ranked candidate list per query.
         """
-        results = []
+        try:
+            results = []
 
-        for qv in query_vectors:
-            hits = self._client.query_points(
-                collection_name=QDRANT_COLLECTION,
-                prefetch=[
+            for qv in query_vectors:
+                hits = self._client.query_points(
+                    collection_name=QDRANT_COLLECTION,
+                    prefetch=[
+                        {
+                            "query": qv.dense,
+                            "using": "dense",
+                            "limit": TOP_K,
+                        },
+                        {
+                            "query": SparseVector(
+                                indices=list(qv.sparse.keys()),
+                                values=list(qv.sparse.values()),
+                            ),
+                            "using": "sparse",
+                            "limit": TOP_K,
+                        },
+                    ],
+                    query=FusionQuery(fusion=Fusion.RRF),
+                    limit=TOP_K,
+                    with_payload=True,
+                )
+
+                results.append([
                     {
-                        "query": qv.dense,
-                        "using": "dense",
-                        "limit": TOP_K,
-                    },
-                    {
-                        "query": SparseVector(
-                            indices=list(qv.sparse.keys()),
-                            values=list(qv.sparse.values()),
-                        ),
-                        "using": "sparse",
-                        "limit": TOP_K,
-                    },
-                ],
-                query=FusionQuery(fusion=Fusion.RRF),
-                limit=TOP_K,
-                with_payload=True,
-            )
+                        "text": hit.payload.get("text", ""),
+                        "source_file": hit.payload.get("source", ""),
+                        "page": hit.payload.get("page", 0),
+                        "score": hit.score,
+                        "query": qv.query,
+                    }
+                    for hit in hits.points
+                ])
 
-            results.append([
-                {
-                    "text": hit.payload.get("text", ""),
-                    "source_file": hit.payload.get("source", ""),
-                    "page": hit.payload.get("page", 0),
-                    "score": hit.score,
-                    "query": qv.query,
-                }
-                for hit in hits.points
-            ])
-
-        return results
+            return results
+    
+        except Exception as e:
+            print(f"[RetrievalModule] Qdrant unavailable: {e}")
+            return [[] for _ in query_vectors]

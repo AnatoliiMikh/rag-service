@@ -17,7 +17,11 @@ HISTORY_N = int(os.getenv("HISTORY_N", "10"))
 
 class HistoryModule:
     def __init__(self):
-        self._pool = psycopg2.pool.SimpleConnectionPool(
+        self._pool = None  # no connection attempt at startup
+
+    def _get_pool(self):
+        if self._pool is None:
+            self._pool = psycopg2.pool.SimpleConnectionPool(
             minconn=1,
             maxconn=10,
             host=POSTGRES_HOST,
@@ -25,27 +29,30 @@ class HistoryModule:
             dbname=POSTGRES_DB,
             user=POSTGRES_USER,
             password=POSTGRES_PASSWORD,
-        )
+            )
+        return self._pool
+
 
     def get(self, chat_id: str, n: int = HISTORY_N) -> list[dict]:
-        """
-        Fetches last N messages for chat_id.
-        Returns oldest → newest for LLM context.
-        """
-        conn = self._pool.getconn()
         try:
-            with conn.cursor() as cur:
-                cur.execute("""
-                    SELECT role, content
-                    FROM messages
-                    WHERE chat_id = %s
-                    ORDER BY created_at DESC
-                    LIMIT %s
-                """, (chat_id, n))
-                rows = cur.fetchall()
-                return [
-                    {"role": row[0], "content": row[1]}
-                    for row in reversed(rows)
-                ]
-        finally:
-            self._pool.putconn(conn)
+            pool = self._get_pool()        # ← use the method, not self._pool directly
+            conn = pool.getconn()
+            try:
+                with conn.cursor() as cur:
+                    cur.execute("""
+                        SELECT role, content
+                        FROM messages
+                        WHERE chat_id = %s
+                        ORDER BY created_at DESC
+                        LIMIT %s
+                    """, (chat_id, n))
+                    rows = cur.fetchall()
+                    return [
+                        {"role": row[0], "content": row[1]}
+                        for row in reversed(rows)
+                    ]
+            finally:
+                pool.putconn(conn)         # ← use pool variable, not self._pool
+        except Exception as e:
+            print(f"[HistoryModule] PostgreSQL unavailable: {e}")
+            return []
