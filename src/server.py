@@ -79,6 +79,8 @@ class MessageServiceServicer(rag_service_pb2_grpc.MessageServiceServicer):
             )
 
         except Exception as e:
+            import traceback
+            traceback.print_exc()
             yield rag_service_pb2.NewMessageChunkResponse(
                 error=rag_service_pb2.Error(message=str(e)),
                 conversation_id=conversation_id,
