@@ -52,7 +52,7 @@ class RetrievalModule:
             results.append([
                 {
                     "text": hit.payload.get("text", ""),
-                    "source_file": hit.payload.get("source_file", ""),
+                    "source_file": hit.payload.get("source", ""),
                     "page": hit.payload.get("page", 0),
                     "score": hit.score,
                     "query": qv.query,
