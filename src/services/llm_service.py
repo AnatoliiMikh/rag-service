@@ -70,7 +70,7 @@ class LLMService:
 
         messages = [{"role": "user", "content": prompt}]
 
-        tokenized = self._tokenizer.apply_chat_template(
+        input_ids = self._tokenizer.apply_chat_template(
             messages,
             return_tensors="pt",
             add_generation_prompt=True,
@@ -79,14 +79,14 @@ class LLMService:
 
         with torch.inference_mode():
             output_ids = self._model.generate(
-                tokenized,
+                input_ids=input_ids,
                 max_new_tokens=256,
                 temperature=0.7,
                 do_sample=True,
                 pad_token_id=self._tokenizer.eos_token_id,
             )
 
-        new_tokens = output_ids[0][tokenized.shape[1]:]
+        new_tokens = output_ids[0][input_ids.shape[1]:]
         raw = self._tokenizer.decode(new_tokens, skip_special_tokens=True).strip()
 
         try:
