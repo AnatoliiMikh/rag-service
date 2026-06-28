@@ -1,22 +1,22 @@
-# LLM & API client
-openai==1.30.1
-httpx==0.27.0
+# LLM & Transformers
+transformers>=5.0.0
+torch>=2.0.0
 
-# Environment
-python-dotenv==1.0.1
+# Embeddings & Reranker
+FlagEmbedding>=1.4.0
 
 # Vector DB
-qdrant-client==1.9.1
-
-# Embeddings & Reranker (GPU server only)
-FlagEmbedding==1.2.11
+qdrant-client>=1.9.0
 
 # PostgreSQL
-psycopg2-binary==2.9.9
+psycopg2-binary>=2.9.9
 
 # gRPC
-grpcio==1.64.1
-grpcio-tools==1.64.1
+grpcio>=1.81.0
+grpcio-tools>=1.81.0
+
+# Environment
+python-dotenv>=1.0.0
 
 # Data validation
-pydantic==2.7.1
+pydantic>=2.7.0
