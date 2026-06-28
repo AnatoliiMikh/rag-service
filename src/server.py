@@ -11,14 +11,14 @@ import grpc.aio
 import rag_service_pb2
 import rag_service_pb2_grpc
 
-from services.llm_service       import LLMService
+from services.llm_service import LLMService
 from services.embedding_service import EmbeddingService
-from services.reranker_service  import RerankerService
-from services.scheduler         import Scheduler
-from modules.history            import HistoryModule
-from modules.retrieval          import RetrievalModule
-from modules.context_builder    import build_context
-from pipeline                   import RAGPipeline
+from services.reranker_service import RerankerService
+from services.scheduler import Scheduler
+from modules.history import HistoryModule
+from modules.retrieval import RetrievalModule
+from modules.context_builder import build_context
+from pipeline import RAGPipeline
 
 GRPC_PORT = os.getenv("GRPC_PORT", "50051")
 
@@ -36,7 +36,7 @@ class MessageServiceServicer(rag_service_pb2_grpc.MessageServiceServicer):
         Sends Error on exception.
         """
         conversation_id = request.conversation_id
-        user_message    = request.user_message
+        user_message = request.user_message
 
         try:
             result_queue = await self._scheduler.submit(
@@ -89,12 +89,12 @@ async def main():
     print("[Server] Initializing services...")
 
     # Load all GPU models sequentially — one CUDA context
-    llm      = LLMService()
+    llm = LLMService()
     embedder = EmbeddingService()
     reranker = RerankerService()
 
     # Initialize stateless modules
-    history   = HistoryModule()
+    history = HistoryModule()
     retrieval = RetrievalModule()
 
     # Wire pipeline with dependency injection

@@ -4,7 +4,7 @@ from services.llm_service import LLMService
 from services.embedding_service import EmbeddingService
 from services.reranker_service  import RerankerService
 from modules.history import HistoryModule
-from modules.retrieval_old import RetrievalModule
+from modules.retrieval import RetrievalModule
 from modules.context_builder import build_context
 
 
