@@ -75,16 +75,19 @@ class LLMService:
             add_generation_prompt=True,
         ).to("cuda")
 
+        prompt_len = inputs["input_ids"].shape[1]
+
         with torch.inference_mode():
             outputs = self._model.generate(
-                input_ids=inputs,
+                **inputs,
                 max_new_tokens=256,
                 temperature=0.7,
                 do_sample=True,
                 pad_token_id=self._tokenizer.eos_token_id,
             )
 
-        new_tokens = outputs[0][inputs.shape[1]:]
+        new_tokens = outputs[0][prompt_len:]
+
         raw = self._tokenizer.decode(new_tokens, skip_special_tokens=True).strip()
 
         try:
