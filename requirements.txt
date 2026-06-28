@@ -1,7 +1,7 @@
 # LLM & Transformers
 transformers>=5.0.0
 torch>=2.0.0
-kernels>=0.1.0
+
 
 # Embeddings & Reranker
 FlagEmbedding>=1.4.0
