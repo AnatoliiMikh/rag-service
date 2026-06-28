@@ -77,7 +77,7 @@ class LLMService:
 
         with torch.inference_mode():
             outputs = self._model.generate(
-                inputs,
+                inputs_ids=inputs,
                 max_new_tokens=256,
                 temperature=0.7,
                 do_sample=True,
