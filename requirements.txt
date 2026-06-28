@@ -1,5 +1,6 @@
 # LLM & Transformers
-transformers>=5.0.0
+# transformers>=5.0.0
+transformers==4.51.3
 torch>=2.0.0
 
 
