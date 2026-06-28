@@ -1,0 +1,33 @@
+syntax = "proto3";
+
+package LLMWorkerAPI;
+
+service MessageService {
+  rpc GenerateReply (NewMessageRequest) returns (stream NewMessageChunkResponse);
+}
+
+message NewMessageRequest {
+  int64  conversation_id = 1;
+  string user_message    = 2;
+}
+
+message TokenChunk {
+  string text = 1;
+}
+
+message Completion {
+  string full_text = 1;
+}
+
+message Error {
+  string message = 1;
+}
+
+message NewMessageChunkResponse {
+  oneof event {
+    TokenChunk token      = 1;
+    Completion completion = 2;
+    Error      error      = 3;
+  }
+  int64 conversation_id = 4;
+}
