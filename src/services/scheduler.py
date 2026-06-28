@@ -53,10 +53,12 @@ class Scheduler:
                     await request.result_queue.put(token)
 
             except Exception as e:
+                import traceback
+                print("[Scheduler] Pipeline error:")
+                traceback.print_exc()
                 await request.result_queue.put(Exception(e))
 
             finally:
-                # None signals end of stream to gRPC server
                 await request.result_queue.put(None)
                 self._queue.task_done()
 
