@@ -44,7 +44,7 @@ class LLMService:
         print("[LLMService] Loading model into GPU...")
         self._model = AutoModelForCausalLM.from_pretrained(
             LLM_MODEL_PATH,
-            torch_dtype=torch.float8_e4m3fn,
+            torch_dtype="auto",
             device_map="cuda",
         )
         self._model.eval()
