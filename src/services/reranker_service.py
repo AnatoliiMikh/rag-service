@@ -21,14 +21,18 @@ class RerankerService:
         )
         print("[RerankerService] Ready.")
 
-    def rerank(self, query: str, candidate_lists: list[list[dict]]) -> list[dict]:
+    def rerank(
+        self,
+        query: str,
+        dense_lists: list[list[dict]],
+        bm25_lists: list[list[dict]],
+    ) -> list[dict]:
         """
-        Step 1 - RRF: merges 3 ranked lists into deduplicated pool.
+        Step 1 - RRF: merges dense + BM25 lists into one pool.
         Step 2 - Cross-encoder: scores (query, chunk) pairs.
         Returns top N chunks by cross-encoder score.
         """
-        merged = self._rrf_merge(candidate_lists)
-
+        merged = self._rrf_merge(dense_lists + bm25_lists)
         if not merged:
             return []
 
@@ -45,9 +49,8 @@ class RerankerService:
 
     def _rrf_merge(self, candidate_lists: list[list[dict]]) -> list[dict]:
         """
-        Reciprocal Rank Fusion across 3 per-query candidate lists.
-        Deduplicates by text. Boosts chunks appearing in multiple lists.
-        Formula: score += 1 / (k + rank + 1)
+        Reciprocal Rank Fusion across all candidate lists.
+        Deduplicates by text. Formula: score += 1 / (k + rank + 1)
         """
         rrf_scores: dict[str, float] = {}
         chunk_map: dict[str, dict] = {}
