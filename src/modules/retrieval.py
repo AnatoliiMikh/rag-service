@@ -54,9 +54,10 @@ class RetrievalModule:
         try:
             results = []
             for qv in query_vectors:
-                hits = self._client.search(
+                hits = self._client.query_points(
                     collection_name=QDRANT_COLLECTION,
-                    query_vector=("", qv.dense),
+                    query=qv.dense,
+                    using="",
                     limit=TOP_K,
                     with_payload=True,
                 )
