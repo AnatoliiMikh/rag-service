@@ -1,7 +1,7 @@
 # src/services/reranker_service.py
 
 import os
-from FlagEmbedding import FlagReranker
+from sentence_transformers import CrossEncoder
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -14,9 +14,8 @@ RRF_K = int(os.getenv("RRF_K", "60"))
 class RerankerService:
     def __init__(self):
         print("[RerankerService] Loading BGE-Reranker...")
-        self._reranker = FlagReranker(
+        self._reranker = CrossEncoder(
             RERANKER_MODEL_PATH,
-            use_fp16=True,
             device="cuda",
         )
         print("[RerankerService] Ready.")
@@ -37,13 +36,10 @@ class RerankerService:
             return []
 
         pairs = [[query, chunk["text"]] for chunk in merged]
-        scores = self._reranker.compute_score(pairs, normalize=True)
-
-        if not isinstance(scores, list):
-            scores = [scores]
+        scores = self._reranker.predict(pairs)
 
         for i, chunk in enumerate(merged):
-            chunk["ce_score"] = scores[i]
+            chunk["ce_score"] = float(scores[i])
 
         return sorted(merged, key=lambda c: c["ce_score"], reverse=True)[:TOP_N]
 
