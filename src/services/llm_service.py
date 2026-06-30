@@ -13,9 +13,9 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-LLM_MODEL_PATH   = os.getenv("LLM_MODEL_PATH", "Qwen/Qwen3-4B-Instruct-2507-FP8")
-LLM_MAX_TOKENS   = int(os.getenv("LLM_MAX_TOKENS", "1024"))
-LLM_TEMPERATURE  = float(os.getenv("LLM_TEMPERATURE", "0.1"))
+LLM_MODEL_PATH = os.getenv("LLM_MODEL_PATH", "Qwen/Qwen3-4B-Instruct-2507")
+LLM_MAX_TOKENS = int(os.getenv("LLM_MAX_TOKENS", "1024"))
+LLM_TEMPERATURE = float(os.getenv("LLM_TEMPERATURE", "0.1"))
 
 EXPANSION_PROMPT = """\
 You are a search query rewriter for a university information retrieval system.
@@ -42,30 +42,19 @@ class LLMService:
         self._tokenizer = AutoTokenizer.from_pretrained(LLM_MODEL_PATH)
 
         print("[LLMService] Loading model into GPU...")
-
-        # Old version for FP8 model (delete if not needed)  
-        # self._model = AutoModelForCausalLM.from_pretrained(
-        #     LLM_MODEL_PATH,
-        #     torch_dtype="auto",
-        #     device_map="cuda",
-        # )
-        # self._model.eval()
         self._model = AutoModelForCausalLM.from_pretrained(
             LLM_MODEL_PATH,
             torch_dtype=torch.bfloat16,
         ).cuda()
-
         self._model.eval()
 
-        # Prefix KV cache — stores KV states for static system prompt prefix
-        # Computed once on first request, reused across all subsequent requests
         self._prefix_kv: tuple | None = None
         self._prefix_token_len: int = 0
 
         print("[LLMService] Ready.")
 
     # ------------------------------------------------------------------ #
-    #  Query Expansion                                                     #
+    #  Query Expansion                                                   #
     # ------------------------------------------------------------------ #
 
     def expand_query(self, message: str) -> list[str]:
@@ -75,14 +64,12 @@ class LLMService:
         Falls back to [message x3] on malformed output.
         """
         prompt = EXPANSION_PROMPT.format(message=message)
-
         messages = [{"role": "user", "content": prompt}]
 
         inputs = self._tokenizer.apply_chat_template(
             messages,
             return_tensors="pt",
             add_generation_prompt=True,
-            # tokenize=True,
         ).to("cuda")
 
         prompt_len = inputs["input_ids"].shape[1]
@@ -110,90 +97,93 @@ class LLMService:
         return [message, message, message]
 
     # ------------------------------------------------------------------ #
-    #  Answer Generation                                                   #
+    #  Answer Generation                                                 #
     # ------------------------------------------------------------------ #
 
-def generate(self, messages: list[dict]):
-    """
-    Takes assembled OpenAI-format message list from context_builder.
-    Streams tokens via TextIteratorStreamer.
-    Yields token strings one by one.
-    Uses prefix KV cache for system prompt reuse.
-    """
-    tokenized = self._tokenizer.apply_chat_template(
-        messages,
-        return_tensors="pt",
-        add_generation_prompt=True,
-    )
-    input_ids = tokenized.input_ids if hasattr(tokenized, "input_ids") else tokenized
-    input_ids = input_ids.to("cuda")
-
-    past_kv = self._get_prefix_kv(messages)
-
-    if past_kv is not None:
-        input_ids = input_ids[:, self._prefix_token_len:]
-
-    streamer = TextIteratorStreamer(
-        self._tokenizer,
-        skip_prompt=True,
-        skip_special_tokens=True,
-    )
-
-    attention_mask = torch.ones_like(input_ids)
-
-    generation_kwargs = dict(
-        input_ids=input_ids,
-        past_key_values=past_kv,
-        attention_mask=attention_mask,
-        max_new_tokens=LLM_MAX_TOKENS,
-        temperature=LLM_TEMPERATURE,
-        do_sample=True,
-        pad_token_id=self._tokenizer.eos_token_id,
-        streamer=streamer,
-    )
-
-    thread = Thread(target=self._model.generate, kwargs=generation_kwargs)
-    thread.start()
-
-    for token in streamer:
-        yield token
-
-    thread.join()
-
-
-def _get_prefix_kv(self, messages: list[dict]) -> tuple | None:
-    """
-    Extracts static system prompt prefix.
-    Computes KV states once, reuses across requests.
-    """
-    if not messages or messages[0]["role"] != "system":
-        return None
-
-    system_content = messages[0]["content"]
-    split_marker = "### RETRIEVED CONTEXT"
-    if split_marker not in system_content:
-        return None
-
-    static_prefix = system_content.split(split_marker)[0]
-
-    if self._prefix_kv is None:
-        prefix_messages = [{"role": "system", "content": static_prefix}]
+    def generate(self, messages: list[dict]):
+        """
+        Takes assembled OpenAI-format message list from context_builder.
+        Streams tokens via TextIteratorStreamer.
+        Yields token strings one by one.
+        Uses prefix KV cache for system prompt reuse.
+        """
         tokenized = self._tokenizer.apply_chat_template(
-            prefix_messages,
+            messages,
             return_tensors="pt",
-            add_generation_prompt=False,
+            add_generation_prompt=True,
         )
-        prefix_input_ids = tokenized.input_ids if hasattr(tokenized, "input_ids") else tokenized
-        prefix_input_ids = prefix_input_ids.to("cuda")
+        input_ids = tokenized.input_ids if hasattr(tokenized, "input_ids") else tokenized
+        input_ids = input_ids.to("cuda")
 
-        with torch.inference_mode():
-            prefix_output = self._model(
-                prefix_input_ids,
-                use_cache=True,
+        past_kv = self._get_prefix_kv(messages)
+
+        if past_kv is not None:
+            input_ids = input_ids[:, self._prefix_token_len:]
+
+        streamer = TextIteratorStreamer(
+            self._tokenizer,
+            skip_prompt=True,
+            skip_special_tokens=True,
+        )
+
+        attention_mask = torch.ones_like(input_ids)
+
+        generation_kwargs = dict(
+            input_ids=input_ids,
+            past_key_values=past_kv,
+            attention_mask=attention_mask,
+            max_new_tokens=LLM_MAX_TOKENS,
+            temperature=LLM_TEMPERATURE,
+            do_sample=True,
+            pad_token_id=self._tokenizer.eos_token_id,
+            streamer=streamer,
+        )
+
+        thread = Thread(target=self._model.generate, kwargs=generation_kwargs)
+        thread.start()
+
+        for token in streamer:
+            yield token
+
+        thread.join()
+
+    # ------------------------------------------------------------------ #
+    #  Prefix KV Cache                                                   #
+    # ------------------------------------------------------------------ #
+
+    def _get_prefix_kv(self, messages: list[dict]) -> tuple | None:
+        """
+        Extracts static system prompt prefix.
+        Computes KV states once, reuses across requests.
+        """
+        if not messages or messages[0]["role"] != "system":
+            return None
+
+        system_content = messages[0]["content"]
+        split_marker = "### RETRIEVED CONTEXT"
+        if split_marker not in system_content:
+            return None
+
+        static_prefix = system_content.split(split_marker)[0]
+
+        if self._prefix_kv is None:
+            prefix_messages = [{"role": "system", "content": static_prefix}]
+            tokenized = self._tokenizer.apply_chat_template(
+                prefix_messages,
+                return_tensors="pt",
+                add_generation_prompt=False,
             )
-            self._prefix_kv = prefix_output.past_key_values
-            self._prefix_token_len = prefix_input_ids.shape[1]
+            prefix_input_ids = tokenized.input_ids if hasattr(tokenized, "input_ids") else tokenized
+            prefix_input_ids = prefix_input_ids.to("cuda")
 
-        print(f"[LLMService] Prefix KV cache built: {self._prefix_token_len} tokens cached.")
+            with torch.inference_mode():
+                prefix_output = self._model(
+                    prefix_input_ids,
+                    use_cache=True,
+                )
+                self._prefix_kv = prefix_output.past_key_values
+                self._prefix_token_len = prefix_input_ids.shape[1]
 
-    return self._prefix_kv
+            print(f"[LLMService] Prefix KV cache built: {self._prefix_token_len} tokens cached.")
+
+        return self._prefix_kv
