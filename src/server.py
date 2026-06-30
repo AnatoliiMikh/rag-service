@@ -15,6 +15,7 @@ from services.llm_service import LLMService
 from services.embedding_service import EmbeddingService
 from services.reranker_service import RerankerService
 from services.scheduler import Scheduler
+from services.bm25_service import BM25Service
 from modules.history import HistoryModule
 from modules.retrieval import RetrievalModule
 from modules.context_builder import build_context
@@ -90,29 +91,27 @@ class MessageServiceServicer(rag_service_pb2_grpc.MessageServiceServicer):
 async def main():
     print("[Server] Initializing services...")
 
-    # Load all GPU models sequentially — one CUDA context
     llm = LLMService()
     embedder = EmbeddingService()
     reranker = RerankerService()
-
-    # Initialize stateless modules
     history = HistoryModule()
     retrieval = RetrievalModule()
 
-    # Wire pipeline with dependency injection
+    all_chunks = retrieval.load_all_chunks()
+    bm25 = BM25Service(all_chunks)
+
     pipeline = RAGPipeline(
         llm=llm,
         embedder=embedder,
         reranker=reranker,
+        bm25=bm25,
         history=history,
         retrieval=retrieval,
     )
 
-    # Start scheduler
     scheduler = Scheduler(pipeline)
     asyncio.create_task(scheduler.run())
 
-    # Start gRPC server
     server = grpc.aio.server()
     rag_service_pb2_grpc.add_MessageServiceServicer_to_server(
         MessageServiceServicer(scheduler),
@@ -121,12 +120,10 @@ async def main():
 
     listen_addr = f"0.0.0.0:{GRPC_PORT}"
     server.add_insecure_port(listen_addr)
-
     await server.start()
     print(f"[Server] Listening on {listen_addr}")
     print("[Server] Ready.")
 
-    # Graceful shutdown on SIGTERM
     async def shutdown():
         print("[Server] Shutting down...")
         await scheduler.stop()
@@ -135,11 +132,10 @@ async def main():
     loop = asyncio.get_event_loop()
     loop.add_signal_handler(
         __import__("signal").SIGTERM,
-        lambda: asyncio.create_task(shutdown())
+        lambda: asyncio.create_task(shutdown()),
     )
 
     await server.wait_for_termination()
-
 
 if __name__ == "__main__":
     asyncio.run(main())
