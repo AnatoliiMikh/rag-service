@@ -8,7 +8,7 @@ service MessageService {
 
 message NewMessageRequest {
   int64  conversation_id = 1;
-  string user_message    = 2;
+  string user_message = 2;
 }
 
 message TokenChunk {
@@ -27,7 +27,7 @@ message NewMessageChunkResponse {
   oneof event {
     TokenChunk token      = 1;
     Completion completion = 2;
-    Error      error      = 3;
+    Error error = 3;
   }
   int64 conversation_id = 4;
 }
